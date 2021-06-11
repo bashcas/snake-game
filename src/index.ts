@@ -1,6 +1,14 @@
 import "./styles/styles.css"
 import Snake from "./components/Snake"
 import Unit from "./components/Unit"
+import { io } from "socket.io-client"
+import { v4 as uuidv4 } from "uuid"
+// @ts-ignore
+import song from "./static/sounds/telepatia.mp3"
+// @ts-ignore
+import biteSound from "./static/sounds/cartoon_bite.mp3"
+// @ts-ignore
+import gameOverSound from "./static/sounds/pacman-game-over.mp3"
 
 const canvas = <HTMLCanvasElement>document.querySelector("#canvas")
 const size = 20
@@ -22,25 +30,43 @@ restartBtn.addEventListener("click", () => {
   game = setInterval(init, 50)
 })
 
+//Initialize socket client
+const socket = io("https://sheltered-anchorage-03624.herokuapp.com/")
+socket.on("connect", () => {
+  displayId(socket.id)
+})
+
+/**
+ * Sounds
+ */
+const gameSong = new Audio(song)
+gameSong.play()
+const snakeEating = new Audio(biteSound)
+snakeEating.volume = 1
+const gameOver = new Audio(gameOverSound)
+
+const ids_snakes_map: Map<string, Snake> = new Map()
+socket.on("snake", (snake: Snake, emitterId: string) => {
+  Snake.draw(
+    ctx,
+    "black",
+    snake.head,
+    snake.tail,
+    snake.previousHead,
+    snake.previousTail
+  )
+  ids_snakes_map.set(emitterId, snake)
+})
+
 drawGrid()
 let snake: Snake
 let food: Unit
 let score: number
 resetGame()
 let game = setInterval(init, 50)
-
-function resetGame() {
-  ctx.clearRect(0, 0, 600, 600)
-  drawGrid()
-  //Position must be a power of 20
-  snake = new Snake(0, 0, "#fcad03")
-  score = 0
-  food = new Unit("#52fc03")
-  food.drawAtRandomPosition(ctx)
-}
-
 function init() {
   if (snake.body[0].x == food.x && snake.body[0].y == food.y) {
+    snakeEating.play()
     snake.grow()
     score += 10
     food.drawAtRandomPosition(ctx)
@@ -59,17 +85,42 @@ function init() {
       snake.head != unit
     ) {
       //end game
+      gameOver.play()
+      snake.body.forEach((unit) => {
+        Snake.clearRectAndDraw(ctx, unit.x, unit.y)
+      })
       clearInterval(game)
       showBoxDialog(score)
     }
+
+    //detect collision with enemy bodies
+    console.log(ids_snakes_map)
+    if (ids_snakes_map.size > 0) {
+      console.log("enemy")
+      for (let enemy of ids_snakes_map.values()) {
+        enemy.body.forEach((unit) => {
+          if (unit.x == snake.head.x && unit.y == snake.head.y) {
+            gameOver.play()
+            //end game
+            snake.body.forEach((unit) => {
+              Snake.clearRectAndDraw(ctx, unit.x, unit.y)
+            })
+            clearInterval(game)
+            showBoxDialog(score)
+          }
+        })
+      }
+    }
+
+    //detect collapse with borders
     if (unit.x >= canvas.width) {
-      unit.x = -size
+      unit.x = 0
       break
     } else if (unit.x < 0) {
       unit.x = canvas.width
       break
     } else if (unit.y >= canvas.height) {
-      unit.y = -size
+      unit.y = 0
       break
     } else if (unit.y < 0) {
       unit.y = canvas.height
@@ -77,6 +128,9 @@ function init() {
     }
   }
   snake.update(ctx)
+  if (room != null) {
+    socket.emit("snake", { snake, to: room })
+  }
 }
 
 function drawGrid() {
@@ -92,6 +146,68 @@ function drawGrid() {
     ctx.lineTo(canvas.width, size * i)
     ctx.stroke()
   }
+}
+
+function displayId(id: string) {
+  const el = document.getElementById("sessionId")
+  const span = document.createElement("span")
+  span.textContent = id
+  span.style.color = "rgb(98, 0, 238)"
+  el.textContent = `Your id is `
+  el.appendChild(span)
+}
+
+function resetGame() {
+  ctx.clearRect(0, 0, 600, 600)
+  drawGrid()
+  //Position must be a power of 20
+  snake = new Snake(0, 0, "rgb(98, 0, 238)")
+  score = 0
+  food = new Unit("#52fc03")
+  food.drawAtRandomPosition(ctx)
+}
+
+document.getElementById("join-room-form").addEventListener("submit", joinRoom)
+function joinRoom(e: Event) {
+  e.preventDefault()
+  const form = e.currentTarget as HTMLFormElement
+  const data = new FormData(form)
+  const friendRoom = data.get("friend-room-id")
+  socket.emit("join", friendRoom)
+  room = friendRoom as string
+}
+
+let room: string | null = null
+document
+  .getElementById("create-room-form")
+  .addEventListener("submit", createRoom)
+function createRoom(e: Event) {
+  e.preventDefault()
+  room = uuidv4()
+  socket.emit("create room", room)
+  const section = document.querySelector(".options")
+  const container = document.createElement("div")
+  const input = document.createElement("input")
+  input.id = "room-id"
+  input.setAttribute("type", "text")
+  input.value = room
+  input.readOnly = true
+  input.classList.add("input")
+  const button = document.createElement("button")
+  button.addEventListener("click", copyToClipboard)
+  button.textContent = "Copy"
+  button.classList.add("button")
+  container.appendChild(input)
+  container.appendChild(button)
+  section.appendChild(container)
+  document.getElementById("join-room-form").style.display = "none"
+}
+
+function copyToClipboard() {
+  const input = document.getElementById("room-id") as HTMLInputElement
+  input.select()
+  input.setSelectionRange(0, 999999)
+  document.execCommand("copy")
 }
 
 export { size }

@@ -4,6 +4,7 @@ const MiniCSSExtractPlugin = require("mini-css-extract-plugin")
 
 module.exports = {
   entry: path.resolve(__dirname, "../src/index.ts"),
+  devtool: "source-map",
   output: {
     filename: "./bundle.js",
     path: path.resolve(__dirname, "../dist"),
@@ -32,6 +33,13 @@ module.exports = {
         test: /\.ts$/,
         exclude: /node_modules/,
         use: ["ts-loader"],
+      },
+      {
+        test: /\.mp3$/,
+        loader: "file-loader",
+        options: {
+          name: "[path][name].[ext]",
+        },
       },
     ],
   },

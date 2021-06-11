@@ -7,11 +7,35 @@
     <title>Snake game</title>
   </head>
   <body>
-    <canvas id="canvas" width="600" height="600"></canvas>
+    <div id="sessionId"></div>
+    <div class="canvas-container">
+      <canvas id="canvas" width="600" height="600"></canvas>
+    </div>
     <div class="box-dialog hidden">
-      <h3>You've lost</h3>
+      <h3>You lost</h3>
       <p>Your score is: <span class="score"></span></p>
       <button class="btn">Try again</button>
     </div>
+
+    <section class="options">
+      <form id="join-room-form">
+        <div class="form-rivalId-container">
+          <input
+            type="text"
+            name="friend-room-id"
+            class="input"
+            id="friend-room-id"
+            placeholder="Enter a room id"
+          />
+          <button class="button" type="submit">Join room</button>
+        </div>
+      </form>
+      <form id="create-room-form">
+        <button class="button" type="submit">Create room</button>
+      </form>
+    </section>
+    
+
+    </form>
   </body>
 </html>
