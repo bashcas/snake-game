@@ -30,8 +30,7 @@ restartBtn.addEventListener("click", () => {
 })
 
 //Initialize socket client
-// const socket = io("https://sheltered-anchorage-03624.herokuapp.com/")
-const socket = io("http://localhost:3000/")
+const socket = io("https://sheltered-anchorage-03624.herokuapp.com/")
 
 /**
  * Sounds
