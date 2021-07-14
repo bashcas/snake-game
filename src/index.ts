@@ -4,7 +4,7 @@ import Unit from "./components/Unit"
 import { io } from "socket.io-client"
 import { v4 as uuidv4 } from "uuid"
 // @ts-ignore
-import song from "./static/sounds/telepatia.mp3"
+import song from "./static/sounds/walk-in-the-park.mp3"
 // @ts-ignore
 import biteSound from "./static/sounds/cartoon_bite.mp3"
 // @ts-ignore
@@ -27,26 +27,36 @@ const restartBtn = document.querySelector(".btn")
 restartBtn.addEventListener("click", () => {
   boxDialogEl.classList.add("hidden")
   resetGame()
-  game = setInterval(init, 50)
 })
 
 //Initialize socket client
-const socket = io("https://sheltered-anchorage-03624.herokuapp.com/")
-socket.on("connect", () => {
-  displayId(socket.id)
-})
+// const socket = io("https://sheltered-anchorage-03624.herokuapp.com/")
+const socket = io("http://localhost:3000/")
 
 /**
  * Sounds
  */
 const gameSong = new Audio(song)
 gameSong.play()
+gameSong.volume = 0.5
+gameSong.addEventListener("ended", () => {
+  gameSong.currentTime = 0
+  gameSong.play()
+})
 const snakeEating = new Audio(biteSound)
 snakeEating.volume = 1
 const gameOver = new Audio(gameOverSound)
 
 const ids_snakes_map: Map<string, Snake> = new Map()
 socket.on("snake", (snake: Snake, emitterId: string) => {
+  if (
+    (food.x == snake.head.x && food.y == snake.head.y) ||
+    (food.x == snake.previousHead.x && food.y == snake.previousHead.y) ||
+    (food.x == snake.tail.x && food.y == snake.tail.y) ||
+    (food.x == snake.previousTail.x && food.y == snake.previousTail.y)
+  ) {
+    food.drawAtRandomPosition(ctx)
+  }
   Snake.draw(
     ctx,
     "black",
@@ -89,14 +99,14 @@ function init() {
       snake.body.forEach((unit) => {
         Snake.clearRectAndDraw(ctx, unit.x, unit.y)
       })
-      clearInterval(game)
+      snake = new Snake(0, 0, "rgb(98, 0, 238)")
+      socket.emit("snake", { snake, to: room })
+      // clearInterval(game)
       showBoxDialog(score)
     }
 
     //detect collision with enemy bodies
-    console.log(ids_snakes_map)
     if (ids_snakes_map.size > 0) {
-      console.log("enemy")
       for (let enemy of ids_snakes_map.values()) {
         enemy.body.forEach((unit) => {
           if (unit.x == snake.head.x && unit.y == snake.head.y) {
@@ -105,7 +115,9 @@ function init() {
             snake.body.forEach((unit) => {
               Snake.clearRectAndDraw(ctx, unit.x, unit.y)
             })
-            clearInterval(game)
+            snake = new Snake(0, 0, "rgb(98, 0, 238)")
+            socket.emit("snake", { snake, to: room })
+            // clearInterval(game)
             showBoxDialog(score)
           }
         })
@@ -148,15 +160,6 @@ function drawGrid() {
   }
 }
 
-function displayId(id: string) {
-  const el = document.getElementById("sessionId")
-  const span = document.createElement("span")
-  span.textContent = id
-  span.style.color = "rgb(98, 0, 238)"
-  el.textContent = `Your id is `
-  el.appendChild(span)
-}
-
 function resetGame() {
   ctx.clearRect(0, 0, 600, 600)
   drawGrid()
@@ -165,6 +168,7 @@ function resetGame() {
   score = 0
   food = new Unit("#52fc03")
   food.drawAtRandomPosition(ctx)
+  gameSong.play()
 }
 
 document.getElementById("join-room-form").addEventListener("submit", joinRoom)
@@ -186,21 +190,27 @@ function createRoom(e: Event) {
   room = uuidv4()
   socket.emit("create room", room)
   const section = document.querySelector(".options")
-  const container = document.createElement("div")
-  const input = document.createElement("input")
-  input.id = "room-id"
-  input.setAttribute("type", "text")
-  input.value = room
-  input.readOnly = true
-  input.classList.add("input")
-  const button = document.createElement("button")
-  button.addEventListener("click", copyToClipboard)
-  button.textContent = "Copy"
-  button.classList.add("button")
-  container.appendChild(input)
-  container.appendChild(button)
-  section.appendChild(container)
-  document.getElementById("join-room-form").style.display = "none"
+  if (document.getElementById("copy-button") == null) {
+    const container = document.createElement("div")
+    const input = document.createElement("input")
+    input.id = "room-id"
+    input.setAttribute("type", "text")
+    input.value = room
+    input.readOnly = true
+    input.classList.add("input")
+    const button = document.createElement("button")
+    button.addEventListener("click", copyToClipboard)
+    button.textContent = "Copy"
+    button.classList.add("button")
+    button.id = "copy-button"
+    container.appendChild(input)
+    container.appendChild(button)
+    section.appendChild(container)
+    document.getElementById("join-room-form").style.display = "none"
+  } else {
+    const inp = document.getElementById("room-id") as HTMLInputElement
+    inp.value = room
+  }
 }
 
 function copyToClipboard() {
