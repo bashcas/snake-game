@@ -3,6 +3,7 @@ import Snake from "./components/Snake"
 import Unit from "./components/Unit"
 import { io } from "socket.io-client"
 import { v4 as uuidv4 } from "uuid"
+import { getRandomColor } from "./utils/colors"
 // @ts-ignore
 import song from "./static/sounds/walk-in-the-park.mp3"
 // @ts-ignore
@@ -58,7 +59,7 @@ socket.on("snake", (snake: Snake, emitterId: string) => {
   }
   Snake.draw(
     ctx,
-    "black",
+    snake.color,
     snake.head,
     snake.tail,
     snake.previousHead,
@@ -67,12 +68,19 @@ socket.on("snake", (snake: Snake, emitterId: string) => {
   ids_snakes_map.set(emitterId, snake)
 })
 
+socket.on("dead snake", (body) => {
+  body.forEach((unit: Unit) => {
+    Snake.clearRectAndDraw(ctx, unit.x, unit.y)
+  })
+})
+
 drawGrid()
 let snake: Snake
 let food: Unit
 let score: number
 resetGame()
-let game = setInterval(init, 50)
+let game: NodeJS.Timeout
+
 function init() {
   if (snake.body[0].x == food.x && snake.body[0].y == food.y) {
     snakeEating.play()
@@ -93,14 +101,15 @@ function init() {
       snake.body.length > 3 &&
       snake.head != unit
     ) {
+      socket.emit("dead snake", { body: snake.body, to: room })
       //end game
       gameOver.play()
       snake.body.forEach((unit) => {
         Snake.clearRectAndDraw(ctx, unit.x, unit.y)
       })
-      snake = new Snake(0, 0, "rgb(98, 0, 238)")
+      snake = new Snake(0, 0, getRandomColor())
       socket.emit("snake", { snake, to: room })
-      // clearInterval(game)
+      clearInterval(game)
       showBoxDialog(score)
     }
 
@@ -109,14 +118,15 @@ function init() {
       for (let enemy of ids_snakes_map.values()) {
         enemy.body.forEach((unit) => {
           if (unit.x == snake.head.x && unit.y == snake.head.y) {
+            socket.emit("dead snake", { body: snake.body, to: room })
             gameOver.play()
             //end game
             snake.body.forEach((unit) => {
               Snake.clearRectAndDraw(ctx, unit.x, unit.y)
             })
-            snake = new Snake(0, 0, "rgb(98, 0, 238)")
+            snake = new Snake(-40, -40, getRandomColor())
             socket.emit("snake", { snake, to: room })
-            // clearInterval(game)
+            clearInterval(game)
             showBoxDialog(score)
           }
         })
@@ -162,8 +172,13 @@ function drawGrid() {
 function resetGame() {
   ctx.clearRect(0, 0, 600, 600)
   drawGrid()
+  game = setInterval(init, 60)
   //Position must be a power of 20
-  snake = new Snake(0, 0, "rgb(98, 0, 238)")
+  snake = new Snake(
+    Math.floor(Math.random() * 30) * 20,
+    Math.floor(Math.random() * 30) * 20,
+    getRandomColor()
+  )
   score = 0
   food = new Unit("#52fc03")
   food.drawAtRandomPosition(ctx)
@@ -184,6 +199,7 @@ let room: string | null = null
 document
   .getElementById("create-room-form")
   .addEventListener("submit", createRoom)
+
 function createRoom(e: Event) {
   e.preventDefault()
   room = uuidv4()
